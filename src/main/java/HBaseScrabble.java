@@ -1,11 +1,18 @@
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVParser;
+import org.apache.commons.csv.CSVRecord;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.*;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.util.Bytes;
 
 import java.io.*;
+import java.nio.file.*;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 
 public class HBaseScrabble {
@@ -26,7 +33,7 @@ public class HBaseScrabble {
     }
 
     public void createTable() throws IOException {
-        HTableDescriptor table = new HTableDescriptor(TableName.valueOf(Bytes.toBytes("Games")));
+        HTableDescriptor table = new HTableDescriptor(Bytes.toBytes("Games"));
         HColumnDescriptor infoFamily = new HColumnDescriptor(Bytes.toBytes("d"));
         HColumnDescriptor winnerFamily = new HColumnDescriptor(Bytes.toBytes("w"));
         HColumnDescriptor loserFamily = new HColumnDescriptor(Bytes.toBytes("l"));
@@ -37,6 +44,52 @@ public class HBaseScrabble {
     }
 
     public void loadTable(String folder)throws IOException{
+        List<Path> files = Files.walk(Paths.get(folder))
+                .filter(Files::isRegularFile)
+                .collect(Collectors.toList());
+
+        HConnection conn = HConnectionManager.createConnection(this.config);
+        HTable table = new HTable(TableName.valueOf("Games"),conn);
+
+        byte[] infoFamily = Bytes.toBytes("d");
+        byte[] winnerFamily = Bytes.toBytes("w");
+        byte[] loserFamily = Bytes.toBytes("l");
+
+        for(Path file : files) {
+            Reader reader = Files.newBufferedReader(file);
+            CSVParser csvParser = new CSVParser(reader, CSVFormat.DEFAULT.withFirstRecordAsHeader());
+            for (CSVRecord csvRecord : csvParser) {
+                ArrayList<String> values = new ArrayList<>();
+                csvRecord.iterator().forEachRemaining(values::add);
+                byte[] key = getKey(values.toArray(new String[0]), new int[]{1,0});
+                Put put = new Put(key);
+
+                put.add(infoFamily, Bytes.toBytes("gid"), Bytes.toBytes(csvRecord.get(0)));
+                put.add(infoFamily, Bytes.toBytes("tid"), Bytes.toBytes(csvRecord.get(1)));
+                put.add(infoFamily, Bytes.toBytes("tie"), Bytes.toBytes(csvRecord.get(2)));
+                put.add(infoFamily, Bytes.toBytes("rnd"), Bytes.toBytes(csvRecord.get(15)));
+                put.add(infoFamily, Bytes.toBytes("div"), Bytes.toBytes(csvRecord.get(16)));
+                put.add(infoFamily, Bytes.toBytes("date"), Bytes.toBytes(csvRecord.get(17)));
+                put.add(infoFamily, Bytes.toBytes("lex"), Bytes.toBytes(csvRecord.get(18)));
+
+                put.add(winnerFamily, Bytes.toBytes("id"), Bytes.toBytes(csvRecord.get(3)));
+                put.add(winnerFamily, Bytes.toBytes("name"), Bytes.toBytes(csvRecord.get(4)));
+                put.add(winnerFamily, Bytes.toBytes("score"), Bytes.toBytes(csvRecord.get(5)));
+                put.add(winnerFamily, Bytes.toBytes("or"), Bytes.toBytes(csvRecord.get(6)));
+                put.add(winnerFamily, Bytes.toBytes("nr"), Bytes.toBytes(csvRecord.get(7)));
+                put.add(winnerFamily, Bytes.toBytes("pos"), Bytes.toBytes(csvRecord.get(8)));
+
+                put.add(loserFamily, Bytes.toBytes("id"), Bytes.toBytes(csvRecord.get(9)));
+                put.add(loserFamily, Bytes.toBytes("name"), Bytes.toBytes(csvRecord.get(10)));
+                put.add(loserFamily, Bytes.toBytes("score"), Bytes.toBytes(csvRecord.get(11)));
+                put.add(loserFamily, Bytes.toBytes("or"), Bytes.toBytes(csvRecord.get(12)));
+                put.add(loserFamily, Bytes.toBytes("nr"), Bytes.toBytes(csvRecord.get(13)));
+                put.add(loserFamily, Bytes.toBytes("pos"), Bytes.toBytes(csvRecord.get(14)));
+
+
+                table.put(put);
+            }
+        }
     }
 
     /**
@@ -46,11 +99,11 @@ public class HBaseScrabble {
      * @return The encoded key to be inserted in HBase
      */
     private byte[] getKey(String[] values, int[] keyTable) {
-        String keyString = "";
-        for (int keyId : keyTable){
-            keyString += values[keyId];
+        String[] keyValues = new String[keyTable.length];
+        for (int i = 0; i < keyTable.length; i++) {
+           keyValues[i] = values[keyTable[i]];
         }
-        byte[] key = Bytes.toBytes(keyString);
+        byte[] key = Bytes.toBytes(String.join(":", keyValues));
 
         return key;
     }
