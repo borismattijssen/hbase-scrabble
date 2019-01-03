@@ -51,8 +51,6 @@ public class HBaseScrabble {
         HConnection conn = HConnectionManager.createConnection(this.config);
         HTable table = new HTable(TableName.valueOf("Games"),conn);
 
-        List<Put> puts = new ArrayList<>();
-
         byte[] infoFamily = Bytes.toBytes("d");
         byte[] winnerFamily = Bytes.toBytes("w");
         byte[] loserFamily = Bytes.toBytes("l");
@@ -63,7 +61,7 @@ public class HBaseScrabble {
             for (CSVRecord csvRecord : csvParser) {
                 ArrayList<String> values = new ArrayList<>();
                 csvRecord.iterator().forEachRemaining(values::add);
-                byte[] key = getKey(values.toArray(new String[0]), new int[]{0,1});
+                byte[] key = getKey(values.toArray(new String[0]), new int[]{1,0});
                 Put put = new Put(key);
 
                 put.add(infoFamily, Bytes.toBytes("gid"), Bytes.toBytes(csvRecord.get(0)));
@@ -89,10 +87,9 @@ public class HBaseScrabble {
                 put.add(loserFamily, Bytes.toBytes("pos"), Bytes.toBytes(csvRecord.get(14)));
 
 
-                puts.add(put);
+                table.put(put);
             }
         }
-        table.put(puts);
     }
 
     /**
