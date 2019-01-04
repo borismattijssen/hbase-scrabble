@@ -4,6 +4,9 @@ import org.apache.commons.csv.CSVRecord;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.*;
 import org.apache.hadoop.hbase.client.*;
+import org.apache.hadoop.hbase.filter.CompareFilter;
+import org.apache.hadoop.hbase.filter.Filter;
+import org.apache.hadoop.hbase.filter.SingleColumnValueFilter;
 import org.apache.hadoop.hbase.util.Bytes;
 
 import java.io.*;
@@ -19,6 +22,11 @@ public class HBaseScrabble {
     private Configuration config;
     private HBaseAdmin hBaseAdmin;
 
+    private byte[] table = Bytes.toBytes("Games");
+    private byte[] infoFamily = Bytes.toBytes("d");
+    private byte[] winnerFamily = Bytes.toBytes("w");
+    private byte[] loserFamily = Bytes.toBytes("l");
+
     /**
      * The Constructor. Establishes the connection with HBase.
      * @param zkHost
@@ -33,7 +41,7 @@ public class HBaseScrabble {
     }
 
     public void createTable() throws IOException {
-        HTableDescriptor table = new HTableDescriptor(Bytes.toBytes("Games"));
+        HTableDescriptor table = new HTableDescriptor(this.table);
         HColumnDescriptor infoFamily = new HColumnDescriptor(Bytes.toBytes("d"));
         HColumnDescriptor winnerFamily = new HColumnDescriptor(Bytes.toBytes("w"));
         HColumnDescriptor loserFamily = new HColumnDescriptor(Bytes.toBytes("l"));
@@ -50,10 +58,6 @@ public class HBaseScrabble {
 
         HConnection conn = HConnectionManager.createConnection(this.config);
         HTable table = new HTable(TableName.valueOf("Games"),conn);
-
-        byte[] infoFamily = Bytes.toBytes("d");
-        byte[] winnerFamily = Bytes.toBytes("w");
-        byte[] loserFamily = Bytes.toBytes("l");
 
         for(Path file : files) {
             Reader reader = Files.newBufferedReader(file);
@@ -124,9 +128,30 @@ public class HBaseScrabble {
     }
 
     public List<String> query3(String tourneyid) throws IOException {
-        //TO IMPLEMENT
-        System.exit(-1);
-        return null;
+        // filter for ties
+        Filter f = new SingleColumnValueFilter(
+                infoFamily,
+                Bytes.toBytes("tie"), CompareFilter.CompareOp.EQUAL, Bytes.toBytes("True"));
+
+        // create scanner with filters
+        Scan scan = new Scan()
+            .setRowPrefixFilter(Bytes.toBytes(tourneyid + ":"))
+            .setFilter(f);
+
+        HTable hTable = new HTable(this.config, this.table);
+        ResultScanner rs = hTable.getScanner(scan);
+
+        List<String> games = new ArrayList<>();
+
+        Result result = rs.next();
+        while (result!=null && !result.isEmpty()){
+            String[] keys = Bytes.toString(result.getRow()).split(":");
+            String winnerId = Bytes.toString(result.getValue(winnerFamily, Bytes.toBytes("id")));
+            String loserId = Bytes.toString(result.getValue(loserFamily, Bytes.toBytes("id")));
+            games.add(keys[1] + ";" + winnerId + ";" + loserId);
+            result = rs.next();
+        }
+        return games;
     }
 
 
