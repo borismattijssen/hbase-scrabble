@@ -155,41 +155,50 @@ public class HBaseScrabble {
 		Scan scan = new Scan(firstByte,lastByte);
 		ResultScanner rs = hTable.getScanner(scan);
 		
-		
-		HashMap<String, ArrayList<Integer>> idTourneyMap = new HashMap<>();
+		HashMap<String,Integer> idTourneyMap = new HashMap<>();
+		List<String> twicePlayers = new ArrayList<>();
+
 		Result result = rs.next();
 	
 		while (result!=null && !result.isEmpty()) {
-
-			System.out.println(Bytes.toString(result.getValue(infoFamily,Bytes.toBytes("tid"))));
-
+			
 			String idWinnerString = Bytes.toString(result.getValue(winnerFamily,Bytes.toBytes("id")));
 			String idLoserString = Bytes.toString(result.getValue(loserFamily,Bytes.toBytes("id")));
 			Integer tourneyId = Integer.parseInt(Bytes.toString(result.getValue(infoFamily,Bytes.toBytes("tid"))));
-
-			if (idTourneyMap.containsKey(idWinnerString)) {
-				ArrayList<Integer> tourneyList = idTourneyMap.get(idWinnerString);
-				tourneyList.add(tourneyId);
+			
+			// WINNER
+			// check if the player ID is already returned, if not, performe the control:
+			if (twicePlayers.indexOf(idWinnerString) == -1) {
+				if (idTourneyMap.containsKey(idWinnerString)) {
+					int tourneyOld = idTourneyMap.get(idWinnerString);
+					// check if the player appears in two different tourney, so I return it (if the tourney is the same do nothing).
+					if (tourneyOld != tourneyId) {
+						twicePlayers.add(idWinnerString);
+						idTourneyMap.remove(idWinnerString); // I also remove the entry in the HashMap for performance.
+					}
+				}
+				// If it's the first time I see this player, I remember in which tourney has appeared.
+				else idTourneyMap.put(idWinnerString,tourneyId);
 			}
-			else idTourneyMap.put(idWinnerString, new ArrayList<>(Arrays.asList(tourneyId)));
 
-			if (idTourneyMap.containsKey(idLoserString)) {
-				ArrayList<Integer> tourneyList = idTourneyMap.get(idLoserString);
-				tourneyList.add(tourneyId);
-			} else idTourneyMap.put(idLoserString, new ArrayList<>(Arrays.asList(tourneyId)));
+			// LOSER
+			// check if the player ID is already returned, if not, performe the control:
+			if (twicePlayers.indexOf(idLoserString) == -1) {
+				if (idTourneyMap.containsKey(idLoserString)) {
+					int tourneyOld = idTourneyMap.get(idLoserString);
+					// check if the player appears in two different tourney, so I return it (if the tourney is the same do nothing).
+					if (tourneyOld != tourneyId) {
+						twicePlayers.add(idLoserString);
+						idTourneyMap.remove(idLoserString); // I also remove the entry in the HashMap for performance.
+					}
+				}
+				// If it's the first time I see this player, I remember in which tourney has appeared.
+				else idTourneyMap.put(idLoserString,tourneyId);
+			}
 
 			result = rs.next();
 		}
 
-		List<String> twicePlayers = new ArrayList<>();
-
-		for (String playerId : idTourneyMap.keySet()) {
-			
-			ArrayList<Integer> tourneyList = idTourneyMap.get(playerId);
-			HashSet<Integer> tourneySet = new HashSet<>(tourneyList);
-			
-			if (tourneySet.size() > 1) twicePlayers.add(playerId);
-		}
 		return twicePlayers;
 	}
 
