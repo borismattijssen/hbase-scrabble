@@ -13,6 +13,9 @@ import java.io.*;
 import java.nio.file.*;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -143,9 +146,51 @@ public class HBaseScrabble {
 	// Returns the ids of the players (winner and loser) that have participated more than once
 	// in all tournaments between two given Tourneyids.
 	public List<String> query2(String firsttourneyid, String lasttourneyid) throws IOException {
-		//TO IMPLEMENT
-		System.exit(-1);
-		return null;
+		byte [] firstByte = Bytes.toBytes(firsttourneyid);
+		String lasttourneyID = Integer.toString(Integer.parseInt(lasttourneyid) + 1);
+		byte [] lastByte = Bytes.toBytes(lasttourneyID);
+		
+		HTable hTable = new HTable(this.config, this.table);
+
+		Scan scan = new Scan(firstByte,lastByte);
+		ResultScanner rs = hTable.getScanner(scan);
+		
+		
+		HashMap<String, ArrayList<Integer>> idTourneyMap = new HashMap<>();
+		Result result = rs.next();
+	
+		while (result!=null && !result.isEmpty()) {
+
+			System.out.println(Bytes.toString(result.getValue(infoFamily,Bytes.toBytes("tid"))));
+
+			String idWinnerString = Bytes.toString(result.getValue(winnerFamily,Bytes.toBytes("id")));
+			String idLoserString = Bytes.toString(result.getValue(loserFamily,Bytes.toBytes("id")));
+			Integer tourneyId = Integer.parseInt(Bytes.toString(result.getValue(infoFamily,Bytes.toBytes("tid"))));
+
+			if (idTourneyMap.containsKey(idWinnerString)) {
+				ArrayList<Integer> tourneyList = idTourneyMap.get(idWinnerString);
+				tourneyList.add(tourneyId);
+			}
+			else idTourneyMap.put(idWinnerString, new ArrayList<>(Arrays.asList(tourneyId)));
+
+			if (idTourneyMap.containsKey(idLoserString)) {
+				ArrayList<Integer> tourneyList = idTourneyMap.get(idLoserString);
+				tourneyList.add(tourneyId);
+			} else idTourneyMap.put(idLoserString, new ArrayList<>(Arrays.asList(tourneyId)));
+
+			result = rs.next();
+		}
+
+		List<String> twicePlayers = new ArrayList<>();
+
+		for (String playerId : idTourneyMap.keySet()) {
+			
+			ArrayList<Integer> tourneyList = idTourneyMap.get(playerId);
+			HashSet<Integer> tourneySet = new HashSet<>(tourneyList);
+			
+			if (tourneySet.size() > 1) twicePlayers.add(playerId);
+		}
+		return twicePlayers;
 	}
 
 

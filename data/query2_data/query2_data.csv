@@ -1,0 +1,9 @@
+gameid,tourneyid,tie,winnerid,winnername,winnerscore,winneroldrating,winnernewrating,winnerpos,loserid,losername,loserscore,loseroldrating,losernewrating,loserpos,round,division,date,lexicon
+1,1,False,268,Harriette Lakernick,0,1568,1684,1,429,Patricia Barrett,0,1915,1872,3,1,1,1998-12-06,False
+38,2,False,442,Matt Dewaelsche,0,1739,1747,2,429,Patricia Barrett,0,1915,1872,3,4,1,1998-12-06,False
+89,3,False,516,Diana Ittner,0,1259,1384,3,1113,Patricia A Krohn,0,1567,1540,4,8,2,1999-03-20,False
+100,4,False,663,Marty Gabriel,0,1810,1835,3,1890,Jason Kallen,0,1702,1685,9,2,1,1999-03-20,False
+110,5,False,1056,Gail Wolford,0,1905,1884,10,669,Carol Kaplan,0,1865,1873,8,11,1,1999-02-13,False
+860,5,False,393,Frieda Davis,0,1177,1249,1,19,Gloriosa Ondoy Agdeppa,0,1112,1141,6,1,6,1999-02-13,False
+864,5,False,393,Frieda Davis,0,1177,1249,1,3775,May Haney,0,1150,1144,9,3,6,1999-02-13,False
+865,6,False,393,Frieda Davis,0,1177,1249,1,683,Michael Wier,0,1112,1204,3,19,6,1999-02-13,False
