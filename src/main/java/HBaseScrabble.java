@@ -68,7 +68,14 @@ public class HBaseScrabble {
 			for (CSVRecord csvRecord : csvParser) {
 				ArrayList<String> values = new ArrayList<>();
 				csvRecord.iterator().forEachRemaining(values::add);
-				byte[] key = getKey(values.toArray(new String[0]), new int[]{1,0});
+
+
+				String tourneyIdKey = values.get(1);
+				while (tourneyIdKey.length() <= 10) tourneyIdKey = "0" + tourneyIdKey;
+				String gameIdKey = values.get(0);
+				while (gameIdKey.length() <= 10) gameIdKey = "0" + gameIdKey;
+
+				byte[] key = getKey(new String[]{tourneyIdKey, gameIdKey}, new int[]{0, 1});
 				Put put = new Put(key);
 
 				put.add(infoFamily, Bytes.toBytes("gid"), Bytes.toBytes(csvRecord.get(0)));
@@ -118,6 +125,9 @@ public class HBaseScrabble {
 
 	// Returns all the opponents (Loserid) of a given Winnername in a tournament (Tourneyid).
 	public List<String> query1(String tourneyid, String winnername) throws IOException {
+
+		while (tourneyid.length() <= 10) tourneyid = "0" + tourneyid;
+		
 		// filter for winnername
 		Filter f = new SingleColumnValueFilter(
 				winnerFamily,
@@ -136,7 +146,7 @@ public class HBaseScrabble {
 
 		Result result = rs.next();
 		while (result!=null && !result.isEmpty()){
-			String loserId = Bytes.toString(result.getValue(loserFamily, Bytes.toBytes("name")));
+			String loserId = Bytes.toString(result.getValue(loserFamily, Bytes.toBytes("id")));
 			losers.add(loserId);
 			result = rs.next();
 		}
@@ -146,13 +156,18 @@ public class HBaseScrabble {
 	// Returns the ids of the players (winner and loser) that have participated more than once
 	// in all tournaments between two given Tourneyids.
 	public List<String> query2(String firsttourneyid, String lasttourneyid) throws IOException {
-		byte [] firstByte = Bytes.toBytes(firsttourneyid);
-		String lasttourneyID = Integer.toString(Integer.parseInt(lasttourneyid) + 1);
-		byte [] lastByte = Bytes.toBytes(lasttourneyID);
+
+		//lasttourneyid = Integer.toString(Integer.parseInt(lasttourneyid) + 1);
+
+		while (firsttourneyid.length() <= 10) firsttourneyid = "0" + firsttourneyid;
+        while (lasttourneyid.length() <= 10) lasttourneyid = "0" + lasttourneyid;
+
+		byte[] start = Bytes.toBytes(firsttourneyid + ":0000000000");
+        byte[] end = Bytes.toBytes(lasttourneyid + ":9999999999");
 		
 		HTable hTable = new HTable(this.config, this.table);
 
-		Scan scan = new Scan(firstByte,lastByte);
+		Scan scan = new Scan(start,end);
 		ResultScanner rs = hTable.getScanner(scan);
 		
 		HashMap<String,Integer> idTourneyMap = new HashMap<>();
@@ -174,7 +189,7 @@ public class HBaseScrabble {
 					// check if the player appears in two different tourney, so I return it (if the tourney is the same do nothing).
 					if (tourneyOld != tourneyId) {
 						twicePlayers.add(idWinnerString);
-						idTourneyMap.remove(idWinnerString); // I also remove the entry in the HashMap for performance.
+						idTourneyMap.remove(idWinnerString); // I also remove the entry in the HashMap.
 					}
 				}
 				// If it's the first time I see this player, I remember in which tourney has appeared.
@@ -189,7 +204,7 @@ public class HBaseScrabble {
 					// check if the player appears in two different tourney, so I return it (if the tourney is the same do nothing).
 					if (tourneyOld != tourneyId) {
 						twicePlayers.add(idLoserString);
-						idTourneyMap.remove(idLoserString); // I also remove the entry in the HashMap for performance.
+						idTourneyMap.remove(idLoserString); // I also remove the entry in the HashMap.
 					}
 				}
 				// If it's the first time I see this player, I remember in which tourney has appeared.
@@ -205,6 +220,9 @@ public class HBaseScrabble {
 
 	//Given a Tourneyid, the query returns the Gameid, the ids of the two participants that have finished in tie.
 	public List<String> query3(String tourneyid) throws IOException {
+
+		while (tourneyid.length() <= 10) tourneyid = "0" + tourneyid;
+
 		// filter for ties
 		Filter f = new SingleColumnValueFilter(
 				infoFamily,
@@ -222,10 +240,10 @@ public class HBaseScrabble {
 
 		Result result = rs.next();
 		while (result!=null && !result.isEmpty()){
-			String[] keys = Bytes.toString(result.getRow()).split(":");
 			String winnerId = Bytes.toString(result.getValue(winnerFamily, Bytes.toBytes("id")));
 			String loserId = Bytes.toString(result.getValue(loserFamily, Bytes.toBytes("id")));
-			games.add(keys[1] + ";" + winnerId + ";" + loserId);
+			String gameId = Bytes.toString(result.getValue(infoFamily, Bytes.toBytes("gid")));
+			games.add(gameId + ";" + winnerId + ";" + loserId);
 			result = rs.next();
 		}
 		return games;
