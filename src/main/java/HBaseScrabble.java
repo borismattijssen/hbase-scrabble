@@ -157,68 +157,63 @@ public class HBaseScrabble {
 	// in all tournaments between two given Tourneyids.
 	public List<String> query2(String firsttourneyid, String lasttourneyid) throws IOException {
 
-		//lasttourneyid = Integer.toString(Integer.parseInt(lasttourneyid) + 1);
-
 		while (firsttourneyid.length() <= 10) firsttourneyid = "0" + firsttourneyid;
         while (lasttourneyid.length() <= 10) lasttourneyid = "0" + lasttourneyid;
 
 		byte[] start = Bytes.toBytes(firsttourneyid + ":0000000000");
-        byte[] end = Bytes.toBytes(lasttourneyid + ":9999999999");
+        byte[] end = Bytes.toBytes(lasttourneyid + ":0000000000");
 		
 		HTable hTable = new HTable(this.config, this.table);
 
 		Scan scan = new Scan(start,end);
 		ResultScanner rs = hTable.getScanner(scan);
-		
-		HashMap<String,Integer> idTourneyMap = new HashMap<>();
-		List<String> twicePlayers = new ArrayList<>();
+				
+		// Logic: for each tourney, the set of players appeared twice is saved in twiceCurrent.
+		// Only the players appeared twice in the previous tourney are considered during the check.
+		// When the current tourney changes, the twiceCurrent set became the twiceOld set for the new tourney.
+		// In the last iteration, in the twiceCurrent set, there will be all those players "survived".
+		// For the first tourney the player do not need to appear in TwiceOld, for obvious reason.
+		HashSet<String> twiceOld = new HashSet<>();
+		HashSet<String> firstCurrent = new HashSet<>();
+		HashSet<String> twiceCurrent = new HashSet<>();
+
+		int firstTourneyInt = Integer.parseInt(firsttourneyid);
+		int currentTourney = Integer.parseInt(firsttourneyid);
 
 		Result result = rs.next();
-	
+
 		while (result!=null && !result.isEmpty()) {
 			
 			String idWinnerString = Bytes.toString(result.getValue(winnerFamily,Bytes.toBytes("id")));
 			String idLoserString = Bytes.toString(result.getValue(loserFamily,Bytes.toBytes("id")));
-			Integer tourneyId = Integer.parseInt(Bytes.toString(result.getValue(infoFamily,Bytes.toBytes("tid"))));
+			int tourneyId = Integer.parseInt(Bytes.toString(result.getValue(infoFamily,Bytes.toBytes("tid"))));
 			
-			// WINNER
-			// check if the player ID is already returned, if not, performe the control:
-			if (twicePlayers.indexOf(idWinnerString) == -1) {
-				if (idTourneyMap.containsKey(idWinnerString)) {
-					int tourneyOld = idTourneyMap.get(idWinnerString);
-					// check if the player appears in two different tourney, so I return it (if the tourney is the same do nothing).
-					if (tourneyOld != tourneyId) {
-						twicePlayers.add(idWinnerString);
-						idTourneyMap.remove(idWinnerString); // I also remove the entry in the HashMap.
-					}
-				}
-				// If it's the first time I see this player, I remember in which tourney has appeared.
-				else idTourneyMap.put(idWinnerString,tourneyId);
+			if (tourneyId != currentTourney) {
+				firstCurrent = new HashSet<>();
+				twiceOld = twiceCurrent;
+				twiceCurrent = new HashSet<>();
+				currentTourney = tourneyId;
 			}
 
-			// LOSER
-			// check if the player ID is already returned, if not, performe the control:
-			if (twicePlayers.indexOf(idLoserString) == -1) {
-				if (idTourneyMap.containsKey(idLoserString)) {
-					int tourneyOld = idTourneyMap.get(idLoserString);
-					// check if the player appears in two different tourney, so I return it (if the tourney is the same do nothing).
-					if (tourneyOld != tourneyId) {
-						twicePlayers.add(idLoserString);
-						idTourneyMap.remove(idLoserString); // I also remove the entry in the HashMap.
-					}
-				}
-				// If it's the first time I see this player, I remember in which tourney has appeared.
-				else idTourneyMap.put(idLoserString,tourneyId);
+			if (twiceOld.contains(idWinnerString) || currentTourney==firstTourneyInt) {
+				if (firstCurrent.contains(idWinnerString)) twiceCurrent.add(idWinnerString);
+				else firstCurrent.add(idWinnerString);
+			}
+
+			if (twiceOld.contains(idLoserString) || currentTourney==firstTourneyInt) {
+				if (firstCurrent.contains(idLoserString)) twiceCurrent.add(idLoserString);
+				else firstCurrent.add(idLoserString);
 			}
 
 			result = rs.next();
 		}
 
-		return twicePlayers;
+		return (new ArrayList<>(twiceCurrent));
 	}
 
 
-	//Given a Tourneyid, the query returns the Gameid, the ids of the two participants that have finished in tie.
+	// Given a Tourneyid, the query returns the Gameid, the ids of the two
+	// participants that have finished in tie.
 	public List<String> query3(String tourneyid) throws IOException {
 
 		while (tourneyid.length() <= 10) tourneyid = "0" + tourneyid;
